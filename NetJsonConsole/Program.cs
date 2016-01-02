@@ -5,13 +5,22 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.Data;
 using System.IO;
+using Newtonsoft.Json;
 
 
 namespace NetJsonConsole
 {
     class Program
     {
+        /// <summary>
+        /// Simple class demonstrating how to convert data into JSON and back again
+        /// Ex 1 -> Programmer-defined object model, like something you would find a data framework, to JSON
+        /// Ex 2 -> DataTable to JSON: using Json.NET
+        ///     Nuget package Newtonsoft.Json was used for high performance conversions
+        /// </summary>
+        /// <param name="args"></param>
         static void Main(string[] args)
         {
             // instantiate some data
@@ -28,7 +37,23 @@ namespace NetJsonConsole
 
             // serialize the data
             string json = getString(dataArray);
+            Console.WriteLine(json);
 
+            // Now do it with a datatable
+            DataTable dt = new DataTable("MyRows");
+            dt.Columns.Add("ID", typeof(int));
+            dt.Columns.Add("Value", typeof(string));
+            dt.Columns.Add("Deleted", typeof(bool));
+            for (int i = 0; i < 3; i++)
+            {
+                DataRow dr = dt.NewRow();
+                dr["ID"] = i;
+                dr["Value"] = "Row " + i;
+                dr["Deleted"] = false;
+                dt.Rows.Add(dr);
+            }
+
+            json = getStringFromDataTable(dt);
             Console.WriteLine(json);
 
             // wait for the enter key before finishing
@@ -66,6 +91,24 @@ namespace NetJsonConsole
             catch (System.ServiceModel.QuotaExceededException e3)
             {
                 System.Diagnostics.Debug.WriteLine(string.Format("The message quoata has been exceeded"));
+            }
+
+            return formattedJson;
+        }
+
+        // gets the JSON Strring of data from the DataTable
+        private static string getStringFromDataTable(DataTable dataTable)
+        {
+            string formattedJson = string.Empty;
+
+            try
+            {
+                string table = JsonConvert.SerializeObject(dataTable);
+                formattedJson = table;
+            }
+            catch (Exception)
+            {
+                System.Diagnostics.Debug.WriteLine("Hit Exception in JsonConvert.SerializeObject");
             }
 
             return formattedJson;
