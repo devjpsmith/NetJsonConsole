@@ -24,11 +24,23 @@ namespace NetJsonConsole
         /// <param name="args"></param>
         static void Main(string[] args)
         {
+            testObjectModel();
+
+            // Now do it with a datatable
+            // let's use a larger dataset to test performance
+            //testDateTable();
+
+            // wait for the enter key before finishing
+            Console.ReadLine();
+        }
+
+        private static void testObjectModel()
+        {
             // instantiate some data
             ObjectModel[] dataArray = new ObjectModel[3];
             for (int i = 0; i < 3; i++)
             {
-                dataArray[i] = new ObjectModel() 
+                dataArray[i] = new ObjectModel()
                 {
                     ID = i,
                     Value = "Object " + i,
@@ -37,11 +49,32 @@ namespace NetJsonConsole
             }
 
             // serialize the data
-            string json = getString(dataArray);
-            Console.WriteLine(json);
+            byte[] json = getJsonBytes(dataArray);
 
-            // Now do it with a datatable
-            // let's use a larger dataset to test performance
+            List<ObjectModel> objectModelList = getObjectModelList(json);
+
+        }
+
+        private static List<ObjectModel> getObjectModelList(byte[] jsonData)
+        {
+            string json = string.Empty;
+            using (MemoryStream ms = new MemoryStream(jsonData))
+            {
+                int nRead = 0;
+                byte[] buffer = new byte[1024];
+                while ((nRead = ms.Read(buffer, 0, buffer.Length)) == 1024)
+                {
+                    json += Encoding.UTF8.GetString(buffer, 0, buffer.Length);
+                }
+                json += Encoding.UTF8.GetString(buffer, 0, nRead);
+            }
+
+            return JsonConvert.DeserializeObject<List<ObjectModel>>(json);
+        }
+
+        // demonstrate using DataTables
+        private static void testDateTable()
+        {
             DataTable dt = new DataTable("MyRows");
             dt.Columns.Add("ID", typeof(int));
             dt.Columns.Add("Value", typeof(string));
@@ -77,24 +110,25 @@ namespace NetJsonConsole
             }
 
             now = DateTime.Now;
-            json = getStringFromDataTable(dt);
+            string jsonStr = getStringFromDataTable(dt);
             string path = "C:/TestJson.txt";
 
             DateTime complete = new DateTime();
-            byte[] bytes = getJsonBytesFromDataTable(dt);
+
+            byte[] bytes = getCompressedData(jsonStr);
             complete = DateTime.Now;
 
             using (FileStream fs = new FileStream(path, FileMode.OpenOrCreate))
             {
-             // write the output to a file   
+                // write the output to a file   
                 fs.Write(bytes, 0, bytes.Length);
             }
 
-            Console.WriteLine(string.Format("complete in: {0:ss} sec", (complete-now).TotalSeconds));
+            Console.WriteLine(string.Format("complete in: {0:ss} sec", (complete - now).TotalSeconds));
 
 
             // let's decompress and read this now
-            json = getDecompressedDate(bytes);
+            jsonStr = getDecompressedDate(bytes);
 
             path = "C:/TestJsonOut.txt";
             if (!File.Exists(path))
@@ -102,47 +136,17 @@ namespace NetJsonConsole
                 FileStream fs = File.Create(path);
                 fs.Close();
             }
-            File.WriteAllText(path, json, Encoding.UTF8);
+            File.WriteAllText(path, jsonStr, Encoding.UTF8);
 
-
-            // wait for the enter key before finishing
-            Console.ReadLine();
         }
 
         // gets the JSON String of data from the data array
-        private static string getString(ObjectModel[] dataArray)
-        {
-            string formattedJson = string.Empty;
+        private static byte[] getJsonBytes(ObjectModel[] dataArray)
+        {         
+            string jsonStr = JsonConvert.SerializeObject(dataArray);
 
-            try
-            {
+            return Encoding.UTF8.GetBytes(jsonStr);
 
-                DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(ObjectModel[]));
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    jsonSerializer.WriteObject(ms, dataArray);
-                    if (ms != null)
-                    {
-                        ms.Position = 0;
-                        StreamReader sr = new StreamReader(ms);
-                        formattedJson = sr.ReadToEnd();
-                    }    
-                }
-            }
-            catch (InvalidDataContractException e1)
-            {
-                System.Diagnostics.Debug.WriteLine(string.Format("Invalid Data Contract found when serializing"));
-            }
-            catch (SerializationException e2)
-            {
-                System.Diagnostics.Debug.WriteLine(string.Format("Serialization Exception has occurred"));
-            }
-            catch (System.ServiceModel.QuotaExceededException e3)
-            {
-                System.Diagnostics.Debug.WriteLine(string.Format("The message quoata has been exceeded"));
-            }
-
-            return formattedJson;
         }
 
         // gets the JSON Strring of data from the DataTable
@@ -163,18 +167,10 @@ namespace NetJsonConsole
             return formattedJson;
         }
 
-        /// <summary>
-        /// turn a DataTable into a compressed byte array of JSON data
-        /// </summary>
-        /// <param name="dt"></param>
-        /// <returns></returns>
-        private static byte[] getJsonBytesFromDataTable(DataTable dt)
+        private static byte[] getCompressedData(string data)
         {
-            // convert the DataTable into a JSON formatted string
-            string json = getStringFromDataTable(dt);
-                        
             // Encode the string into a UTF-8 byte array
-            byte[] uncompressed = Encoding.UTF8.GetBytes(json);
+            byte[] uncompressed = Encoding.UTF8.GetBytes(data);
             byte[] compressed = null;
 
             using (MemoryStream ms = new MemoryStream())
